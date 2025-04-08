@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace Domain.Interfaces.Services
 {
-    public interface ObjectiveService : BaseRepository<ObjectEntity>
+    public interface IObjectiveService : IBaseService<ObjectEntity>
     {
         Task<List<ObjectEntity>> GetAllObjectEntities(int? userId);
 

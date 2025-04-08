@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace Domain.Interfaces.Services
 {
-    public interface UserService : BaseRepository<User>
+    public interface IUserService : IBaseService<User>
     {
         Task<bool>  Login(string username, string password);
         

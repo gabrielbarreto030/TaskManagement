@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Domain.Interfaces.Services
 {
-    public interface BaseRepository<T> 
+    public interface IBaseService<T> 
     {
         Task<T> Add(T entity);
 

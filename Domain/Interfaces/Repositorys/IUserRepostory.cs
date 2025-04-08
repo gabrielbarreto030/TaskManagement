@@ -8,8 +8,8 @@ using System.Threading.Tasks;
 
 namespace Domain.Interfaces.Repositorys
 {
-    public interface IUserRepostory : BaseRepository<User>
+    public interface IUserRepostory : IBaseRepository<User>
     {
-
+        Task<User> GetByEmail(string email);    
     }
 }

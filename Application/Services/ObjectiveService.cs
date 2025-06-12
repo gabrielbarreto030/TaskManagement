@@ -1,11 +1,11 @@
 ﻿using Domain.Entities;
 using Domain.Interfaces.Repositorys;
 using Domain.Interfaces.Services;
-using System;
-using System.Collections.Generic;
-using System.Linq;
+using System.Net.Http.Headers;
 using System.Text;
-using System.Threading.Tasks;
+using Newtonsoft.Json;
+using Microsoft.Extensions.Configuration;
+
 
 namespace Application.Services
 {
@@ -13,17 +13,41 @@ namespace Application.Services
     public class ObjectiveService : IObjectiveService
     {
         private readonly IObjectiveRepostory _objectiveRepository;
+        private readonly ITaskRepository _taskRepository;
+        private readonly IConfiguration _configuration;
 
 
-        public ObjectiveService(IObjectiveRepostory objectiveRepository)
+        public ObjectiveService(IObjectiveRepostory objectiveRepository,ITaskRepository taskRepository,IConfiguration configuration)
         {
             _objectiveRepository = objectiveRepository;
+            _taskRepository = taskRepository;
+            _configuration = configuration; 
         }
 
 
         public async Task<ObjectEntity> Add(ObjectEntity entity)
         {
-            return await _objectiveRepository.Add(entity);
+            var openAiKey = _configuration["OpenAI:ApiKey"];
+
+            var passos =  await GerarPassosParaObjetivoAsync(entity.Description, openAiKey);
+            var obj= await _objectiveRepository.Add(entity);
+            var list = new List<TaskEntity>();
+            foreach(var passo in passos)
+            {
+                var task = new TaskEntity {
+                    Id = 0,
+                    ObjectiveId = obj.Id,
+                Name=passo,
+                IsCompleted=false,
+                Created_At=DateTime.Now,
+                Updated_At=DateTime.Now     
+                };
+                await _taskRepository.Add(task);
+                list.Add(task);
+                
+            }
+
+            return obj;
         }
 
 
@@ -63,5 +87,53 @@ namespace Application.Services
                 return await _objectiveRepository.GetAll(); 
             }
         }
+
+
+
+
+        public async Task<List<string>> GerarPassosParaObjetivoAsync(string objetivo, string openAiKey)
+    {
+        using var httpClient = new HttpClient();
+        httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", openAiKey);
+
+        var prompt = $"Responda apenas com um array JSON de strings com 10 passos para executar esse objetivo: {objetivo}. Não adicione explicações, apenas o array.";
+
+        var body = new
+        {
+            model = "gpt-4o-mini",
+            messages = new[]
+            {
+            new { role = "user", content = prompt }
+        }
+        };
+
+        var content = new StringContent(JsonConvert.SerializeObject(body), Encoding.UTF8, "application/json");
+
+           var response = await httpClient.PostAsync("https://api.openai.com/v1/chat/completions", content);
+           response.EnsureSuccessStatusCode();
+
+            var responseString = await response.Content.ReadAsStringAsync();
+
+            dynamic json = JsonConvert.DeserializeObject(responseString);
+        string rawContent = json.choices[0].message.content.ToString();
+
+        rawContent = rawContent.Replace("json", "");
+        string jsonArrayString;
+        if (rawContent.Contains("```"))
+        {
+            var partes = rawContent.Split("```");
+
+
+            jsonArrayString = partes.FirstOrDefault(p => p.TrimStart().StartsWith("["));
+        }
+        else
+        {
+            jsonArrayString = rawContent;
+        }
+
+        var passos = JsonConvert.DeserializeObject<List<string>>(jsonArrayString);
+
+        return passos;
     }
+}
 }
